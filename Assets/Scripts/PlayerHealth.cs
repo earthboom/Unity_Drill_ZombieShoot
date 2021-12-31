@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using Photon.Pun;
+using UnityEngine;
 using UnityEngine.UI; // UI 관련 코드
 
 // 플레이어 캐릭터의 생명체로서의 동작을 담당
@@ -37,6 +38,7 @@ public class PlayerHealth : LivingEntity {
     }
 
     // 체력 회복
+    [PunRPC]
     public override void RestoreHealth(float newHealth) {
         // LivingEntity의 RestoreHealth() 실행 (체력 증가)
         base.RestoreHealth(newHealth);
@@ -44,6 +46,7 @@ public class PlayerHealth : LivingEntity {
     }
 
     // 데미지 처리
+    [PunRPC]
     public override void OnDamage(float damage, Vector3 hitPoint, Vector3 hitDirection) {
         // LivingEntity의 OnDamage() 실행(데미지 적용)
         if(!dead){
@@ -66,6 +69,8 @@ public class PlayerHealth : LivingEntity {
 
         playerMovement.enabled = false;
         playerShooter.enabled = false;
+
+        Invoke("Respawn", 5.0f);
     }
 
     private void OnTriggerEnter(Collider other) {
@@ -73,9 +78,28 @@ public class PlayerHealth : LivingEntity {
         if(!dead){
             IItem item = other.GetComponent<IItem>();
             if(item != null){
-                item.Use(gameObject);
+                // 호스트만 아이템 직접 사용 가능.
+                // 호스트에서는 아잍메 사용 후 사욍돈 아이템의 효과를 모든 클라이언트에 동기화.
+                if(PhotonNetwork.IsMasterClient){
+                    item.Use(gameObject);
+                }
+                
                 playerAudioPlayer.PlayOneShot(itemPickupClip);
             }
         }
+    }
+
+    // 부활 처리
+    public void Respawn(){
+        // 로컬 플레이어만 직접 위치 변경 가능
+        if(photonView.IsMine){
+            Vector3 randomSpawnPos = Random.insideUnitSphere * 5.0f;
+            randomSpawnPos.y = 0.0f;
+
+            transform.position = randomSpawnPos;
+        }
+
+        gameObject.SetActive(false);
+        gameObject.SetActive(true);
     }
 }
